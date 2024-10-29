@@ -10,6 +10,8 @@ type TestStruct struct {
 	HH  []Fs    `json:"hh" easy_valid:"len_lt:1"`
 	HHS []*Fs   `json:"hhs" easy_valid:"len_eq:2"`
 	Id  string  `json:"id" easy_valid:"uuid_ver:1;uuid_ver"`
+
+	Rex string `json:"rex" easy_valid:"regex:abc"`
 }
 
 type fs struct {

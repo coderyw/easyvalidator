@@ -32,7 +32,7 @@ func Test_generator_Run(t *testing.T) {
 			generator: "TestStruct.go",
 			pkg:       "github.com/coderyw/easyvalidator/test/model",
 			obj:       EasyMAP_exporter_TestStruct(nil),
-			outFile:   "test/model/TestStruct_easyvalidator.go",
+			outFile:   "test/model/model_easyvalidator.go",
 		}, wantErr: false},
 		{name: "TestFs", fields: fields{
 			generator: "Fs.go",

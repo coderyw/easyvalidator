@@ -48,7 +48,7 @@ func (g *generator) encodeStruct(t reflect.Type) error {
 	for i := 0; i < t.NumField(); i++ {
 		field = t.Field(i)
 		fv = field.Type
-		data, err := g.encodeField(fv, field, false)
+		data, err := g.encodeField(t.Name(), fv, field, false)
 		if err != nil {
 			return err
 		}
@@ -75,7 +75,7 @@ func (g *generator) getTag(s reflect.StructField) string {
 	return tag
 }
 
-func (g *generator) encodeField(fv reflect.Type, field reflect.StructField, isPtr bool) ([]byte, error) {
+func (g *generator) encodeField(structName string, fv reflect.Type, field reflect.StructField, isPtr bool) ([]byte, error) {
 	vad := field.Tag.Get(TAG_VALIDATOR)
 	if len(vad) == 0 {
 		return nil, nil
@@ -90,7 +90,7 @@ func (g *generator) encodeField(fv reflect.Type, field reflect.StructField, isPt
 
 	// 遍历tag，生成对应的验证规则
 	for _, v := range valids {
-		data, err := g.make(fv, field, v)
+		data, err := g.make(structName, fv, field, v)
 		if err != nil {
 			return nil, err
 		}
@@ -99,11 +99,11 @@ func (g *generator) encodeField(fv reflect.Type, field reflect.StructField, isPt
 	return bf.Bytes(), nil
 }
 
-func (g *generator) make(fv reflect.Type, field reflect.StructField, valid validator) ([]byte, error) {
+func (g *generator) make(structName string, fv reflect.Type, field reflect.StructField, valid validator) ([]byte, error) {
 	name := field.Name
 	switch valid.key {
 	case vd.VALIDATOR_REGEX:
-		return g.regexValid(name, valid.key, valid.value)
+		return g.regexValid(structName, name, valid.key, valid.value)
 	case vd.VALIDATOR_INT_GT, vd.VALIDATOR_INT_GTE, vd.VALIDATOR_INT_LT, vd.VALIDATOR_INT_LTE:
 		return g.intValid(fv, field, valid.key, valid.value)
 	case vd.VALIDATOR_MSG_EXISTS:
@@ -151,11 +151,11 @@ func (g *generator) uuidVer(fv reflect.Type, field reflect.StructField, key, val
 	}
 	bf := new(bytes.Buffer)
 	b := `	if %v.MatchString(this.%v) {
-		return validator_helper.FieldError("%v", fmt.Errorf("value '%%v' must be a correct uuid with version '%v'", this.%v))
+		return validator_helper.FieldError("%v", fmt.Errorf("The value of attribute %v must conform to the format of UUID version %v. "))
 	}`
 	g.imports["validator_helper"] = "github.com/coderyw/easyvalidator/helper"
 	g.imports["fmt"] = "fmt"
-	fmt.Fprintln(bf, fmt.Sprintf(b, valib, field.Name, field.Name, val, field.Name))
+	fmt.Fprintln(bf, fmt.Sprintf(b, valib, field.Name, field.Name, field.Name, val))
 	return bf.Bytes(), nil
 }
 
@@ -189,11 +189,11 @@ func (g *generator) lenValid(fv reflect.Type, field reflect.StructField, key, va
 
 	bf := new(bytes.Buffer)
 	b := `	if len(this.%v) %v %v{
-		return validator_helper.FieldError("%v", fmt.Errorf("value '%%v' must be %v '%v'", this.%v))
+		return validator_helper.FieldError("%v", fmt.Errorf("The length of the value of attribute %v must be %v %v. "))
 	}`
 	g.imports["validator_helper"] = "github.com/coderyw/easyvalidator/helper"
 	g.imports["fmt"] = "fmt"
-	fmt.Fprintln(bf, fmt.Sprintf(b, field.Name, op, val, field.Name, notice, value, field.Name))
+	fmt.Fprintln(bf, fmt.Sprintf(b, field.Name, op, val, field.Name, field.Name, notice, value))
 	return bf.Bytes(), nil
 }
 
@@ -230,13 +230,13 @@ func (g *generator) floatValid(fv reflect.Type, field reflect.StructField, key, 
 		notice = "less than or equal to"
 	}
 	b := `	if !(this.%v %v %v) {
-		return validator_helper.FieldError("%v", fmt.Errorf("value '%%v' must be %v '%v'", this.%v))
+		return validator_helper.FieldError("%v", fmt.Errorf("The value of attribute '%v' must be %v '%v'. "))
 	}
 `
 	g.imports["validator_helper"] = "github.com/coderyw/easyvalidator/helper"
 	g.imports["fmt"] = "fmt"
 	bf := new(bytes.Buffer)
-	fmt.Fprintln(bf, fmt.Sprintf(b, fieldName, op, vi, fieldName, notice, vi, fieldName))
+	fmt.Fprintln(bf, fmt.Sprintf(b, fieldName, op, vi, fieldName, fieldName, notice, vi))
 	return bf.Bytes(), nil
 }
 
@@ -248,17 +248,17 @@ func (g *generator) requiredValid(fv reflect.Type, field reflect.StructField, ke
 	switch fv.Kind() {
 	case reflect.Ptr:
 		b = `	if nil == this.%v{
-		return validator_helper.FieldError("%v", fmt.Errorf("value '%%v' must required", this.%v))
+		return validator_helper.FieldError("%v", fmt.Errorf("The value of attribute '%v' must required. "))
 	}`
 		b = fmt.Sprintf(b, field.Name, field.Name, field.Name)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float64, reflect.Float32:
 		b = `	if 0 == this.%v{
-		return validator_helper.FieldError("%v", fmt.Errorf("value '%%v' must required", this.%v))
+		return validator_helper.FieldError("%v", fmt.Errorf("The value of attribute '%v' must required. "))
 	}`
 		b = fmt.Sprintf(b, field.Name, field.Name, field.Name)
 	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
 		b = `	if len(this.%v) ==0{
-		return validator_helper.FieldError("%v", fmt.Errorf("value '%%v' must required", this.%v))
+		return validator_helper.FieldError("%v", fmt.Errorf("The value of attribute '%v' must required. "))
 	}`
 		b = fmt.Sprintf(b, field.Name, field.Name, field.Name)
 	default:
@@ -280,7 +280,7 @@ func (g *generator) msgExistsValid(fv reflect.Type, field reflect.StructField, k
 	fieldName := field.Name
 	bf := new(bytes.Buffer)
 	b := `	if nil == this.%v {
-		return validator_helper.FieldError("%v", fmt.Errorf("value '%%v' must exist", this.%v))
+		return validator_helper.FieldError("%v", fmt.Errorf("The value of attribute '%v' must exist. "))
 	}`
 	b2 := `	if this.%v != nil{
 		if err:= validator_helper.CallValidatorIfExists(this.%v); err!= nil{
@@ -289,7 +289,7 @@ func (g *generator) msgExistsValid(fv reflect.Type, field reflect.StructField, k
 	}`
 	g.imports["validator_helper"] = "github.com/coderyw/easyvalidator/helper"
 	g.imports["fmt"] = "fmt"
-	fmt.Fprintln(bf, fmt.Sprintf(b, fieldName, key, fieldName))
+	fmt.Fprintln(bf, fmt.Sprintf(b, fieldName, fieldName, fieldName))
 	fmt.Fprintln(bf, fmt.Sprintf(b2, fieldName, fieldName, fieldName))
 	return bf.Bytes(), nil
 }
@@ -330,16 +330,16 @@ func (g *generator) intValid(fv reflect.Type, field reflect.StructField, key, va
 	g.imports["validator_helper"] = "github.com/coderyw/easyvalidator/helper"
 	g.imports["fmt"] = "fmt"
 	b := `	if !(this.%v %v %d) {
-		return validator_helper.FieldError("%v", fmt.Errorf("value '%%v' must be %v '%v'", this.%v))
+		return validator_helper.FieldError("%v", fmt.Errorf("The value of attribute '%v' must be %v '%v'. "))
 	}
 `
 	bf := new(bytes.Buffer)
-	fmt.Fprintln(bf, fmt.Sprintf(b, fieldName, op, vi, fieldName, notice, vi, fieldName))
+	fmt.Fprintln(bf, fmt.Sprintf(b, fieldName, op, vi, fieldName, fieldName, notice, vi))
 	return bf.Bytes(), nil
 }
 
 // 正则
-func (g *generator) regexValid(fieldName, key, reg string) ([]byte, error) {
+func (g *generator) regexValid(structName, fieldName, key, reg string) ([]byte, error) {
 	_, err := regexp.Compile(reg)
 	if err != nil {
 		return nil, err
@@ -347,14 +347,15 @@ func (g *generator) regexValid(fieldName, key, reg string) ([]byte, error) {
 	bf := new(bytes.Buffer)
 	g.imports["validator_helper"] = "github.com/coderyw/easyvalidator/helper"
 	g.imports["fmt"] = "fmt"
-	b := `	if ok,err:=regexp.MatchString(this.%v);err!= nil{
-		return err
-	}else if !ok{
-		return validator_helper.FieldError("%v", fmt.Errorf("value '%%v' regexp test failed", this.Name))
+
+	regKey := fmt.Sprintf("_%v_%v", structName, fieldName)
+	g.topVar[regKey] = fmt.Sprintf(`regexp.MustCompile("%v")`, reg)
+	b := `	if %v.MatchString(this.%v){
+		return validator_helper.FieldError("%v", fmt.Errorf("The value of attribute %v must pass regular validation:'%v'. "))
 	}
 
 `
-	fmt.Fprintln(bf, fmt.Sprintf(b, fieldName, fieldName))
+	fmt.Fprintln(bf, fmt.Sprintf(b, regKey, fieldName, fieldName, fieldName, reg))
 	return bf.Bytes(), nil
 }
 
