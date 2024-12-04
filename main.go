@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/coderyw/easyvalidator/bootstrap"
 	"github.com/coderyw/easyvalidator/parser"
+	"github.com/coderyw/easyvalidator/validator"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,18 +16,17 @@ import (
 	_ "github.com/coderyw/easyvalidator/gen"
 )
 
-var buildTags = flag.String("build_tags", "", "build tags to add to generated file")
-var genBuildFlags = flag.String("gen_build_flags", "", "build flags when running the generator while bootstrapping")
-var snakeCase = flag.Bool("snake_case", false, "use snake_case names instead of CamelCase by default")
-var lowerCamelCase = flag.Bool("lower_camel_case", false, "use lowerCamelCase names instead of CamelCase by default")
-var allStructs = flag.Bool("all", false, "generate marshaler/unmarshalers for all structs in a file")
+// var buildTags = flag.String("build_tags", "", "build tags to add to generated file")
+// var genBuildFlags = flag.String("gen_build_flags", "", "build flags when running the generator while bootstrapping")
+var allStructs = flag.Bool("all", false, "generate validator for all structs in a file")
 var excludeFileSuffix = flag.String("exclude_suff", "", "排除文件后缀名")
 var includeFileSuffix = flag.String("include_suff", "", "只需要包含这个后缀的go文件")
 var leaveTemps = flag.Bool("leave_temps", false, "do not delete temporary files")
 var noformat = flag.Bool("noformat", false, "do not run 'gofmt -w' on output file")
 var specifiedName = flag.String("output_filename", "", "specify the filename of the output")
 var processPkg = flag.Bool("pkg", false, "process the whole package instead of just the given file")
-var deleteBefore = flag.Bool("del_before", true, "开始处理前删除以及存在的文件")
+var deleteBefore = flag.Bool("del_before", true, "开始处理前删除以前存在的文件")
+var usages = flag.Bool("usages", false, "print usage information")
 
 func generate(fname string) (err error) {
 	fInfo, err := os.Stat(fname)
@@ -63,26 +63,24 @@ func generate(fname string) (err error) {
 	}
 
 	var trimmedBuildTags string
-	if *buildTags != "" {
-		trimmedBuildTags = strings.TrimSpace(*buildTags)
-	}
+	//if *buildTags != "" {
+	//	trimmedBuildTags = strings.TrimSpace(*buildTags)
+	//}
 
 	var trimmedGenBuildFlags string
-	if *genBuildFlags != "" {
-		trimmedGenBuildFlags = strings.TrimSpace(*genBuildFlags)
-	}
+	//if *genBuildFlags != "" {
+	//	trimmedGenBuildFlags = strings.TrimSpace(*genBuildFlags)
+	//}
 
 	g := bootstrap.Generator{
-		BuildTags:      trimmedBuildTags,
-		GenBuildFlags:  trimmedGenBuildFlags,
-		PkgPath:        p.PkgPath,
-		PkgName:        p.PkgName,
-		Types:          p.StructNames,
-		SnakeCase:      *snakeCase,
-		LowerCamelCase: *lowerCamelCase,
-		LeaveTemps:     *leaveTemps,
-		OutName:        outName,
-		NoFormat:       *noformat,
+		BuildTags:     trimmedBuildTags,
+		GenBuildFlags: trimmedGenBuildFlags,
+		PkgPath:       p.PkgPath,
+		PkgName:       p.PkgName,
+		Types:         p.StructNames,
+		LeaveTemps:    *leaveTemps,
+		OutName:       outName,
+		NoFormat:      *noformat,
 	}
 
 	if err := g.Run(); err != nil {
@@ -95,6 +93,10 @@ func main() {
 	flag.Parse()
 
 	files := flag.Args()
+	if usages != nil && *usages {
+		printUsages()
+		os.Exit(1)
+	}
 
 	gofile := os.Getenv("GOFILE")
 	if *processPkg {
@@ -114,4 +116,48 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+func printUsages() {
+	out := flag.CommandLine.Output()
+	buffer := strings.Builder{}
+
+	buffer.WriteString("Usage of validator key:\n")
+	buffer.WriteString("tag name: easy_valid\n")
+	buffer.WriteString("example: \n\n")
+	buffer.WriteString("type UserInfo struct { \n")
+	buffer.WriteString("\tName string `json:\"name\" easy_valid:\"required\"` \n")
+	buffer.WriteString("}\n\n")
+	buffer.WriteString("单个属性校验(Explain of single validator key):\n")
+	for _, v := range validator.ValidatorUsages {
+		buffer.WriteString("\t")
+		buffer.WriteString(v.Key)
+		buffer.WriteString("\n")
+		buffer.WriteString("\t\t")
+		buffer.WriteString(v.Zh)
+		buffer.WriteString("\n")
+		buffer.WriteString("\t\t")
+		buffer.WriteString(v.En)
+		buffer.WriteString("\n")
+
+	}
+	buffer.WriteString("\n")
+	buffer.WriteString("多个属性联合校验(Joint verification of multiple attributes):\n")
+	buffer.WriteString("使用方式：Age=int_gte:1,int_lt:0|str_eq:12\n")
+	buffer.WriteString("说明：要求属性0<Age<=1时，校验本属性字符串长度是否等于2\n")
+	for _, v := range validator.ValidatorCrossUsages {
+		buffer.WriteString("\t")
+		buffer.WriteString(v.Key)
+		buffer.WriteString("\n")
+		buffer.WriteString("\t\t")
+		buffer.WriteString(v.Zh)
+		buffer.WriteString("\n")
+		buffer.WriteString("\t\t")
+		buffer.WriteString(v.En)
+		buffer.WriteString("\n")
+
+	}
+	fmt.Fprintln(out, buffer.String())
+	//flag.PrintDefaults()
+	//fmt.Println("Usage: easyvalidator [flags] [files]")
 }

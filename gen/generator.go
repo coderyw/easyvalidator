@@ -19,6 +19,7 @@ const pkgUnsafe = "unsafe"
 const pkgFacade = "easy_facade"
 
 const TAG_VALIDATOR = "easy_valid"
+const TAG_CROSS_VALIDATOR = "easy_c_valid"
 
 type generator struct {
 	pkgName       string
@@ -29,6 +30,12 @@ type generator struct {
 	imports       map[string]string
 	topVar        map[string]string
 	str2BytesName string
+	fieldMap      map[string]fieldreflect
+}
+
+type fieldreflect struct {
+	field        reflect.StructField
+	fieldReflect reflect.Type
 }
 
 func NewGenerator(filename string) *generator {
@@ -39,6 +46,7 @@ func NewGenerator(filename string) *generator {
 			//pkgStrconv: "strconv",
 			//pkgUnsafe:  "unsafe",
 		},
+		fieldMap: map[string]fieldreflect{},
 	}
 	return ret
 }
@@ -66,7 +74,8 @@ func (g *generator) Run(out io.Writer) error {
 		t := g.typesUnseen[len(g.typesUnseen)-1]
 		g.typesUnseen = g.typesUnseen[:len(g.typesUnseen)-1]
 		if err = g.encode(t); err != nil {
-			continue
+			fmt.Println("writeStub error=", err)
+			return err
 		}
 	}
 	//fmt.Println(g.out.String())

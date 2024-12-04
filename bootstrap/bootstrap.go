@@ -24,14 +24,10 @@ type Generator struct {
 	PkgPath, PkgName string
 	Types            []string
 
-	SnakeCase      bool
-	LowerCamelCase bool
-
 	OutName       string
 	BuildTags     string
 	GenBuildFlags string
 
-	StubsOnly  bool
 	LeaveTemps bool
 	NoFormat   bool
 }
@@ -95,12 +91,6 @@ func (g *Generator) writeMain() (path string, err error) {
 	if g.BuildTags != "" {
 		fmt.Fprintf(f, "  g.SetBuildTags(%q)\n", g.BuildTags)
 	}
-	if g.SnakeCase {
-		fmt.Fprintln(f, "  g.UseSnakeCase()")
-	}
-	if g.LowerCamelCase {
-		fmt.Fprintln(f, "  g.UseLowerCamelCase()")
-	}
 
 	sort.Strings(g.Types)
 	for _, v := range g.Types {
@@ -126,9 +116,6 @@ func (g *Generator) Run() error {
 	if err := g.writeStub(); err != nil {
 		fmt.Println("writeStub error=", err)
 		return err
-	}
-	if g.StubsOnly {
-		return nil
 	}
 	path, err := g.writeMain()
 	if err != nil {
